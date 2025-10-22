@@ -45,6 +45,15 @@ const RecipesPage = () => {
         <h2>Family favorites</h2>
         <p>Browse each recipe for ingredients, instructions, and cooking tips.</p>
       </header>
+      <div className="recipes-toolbar">
+        <div>
+          <h3>Have a signature dish?</h3>
+          <p>We love new additions. Share your recipe and we&apos;ll feature it after a quick review.</p>
+        </div>
+        <Link className="button ghost" to="/recipes/submit">
+          Submit a recipe
+        </Link>
+      </div>
       <div className="recipe-grid">
         {recipes.map((recipe) => (
           <article key={recipe.id} className="recipe-card">

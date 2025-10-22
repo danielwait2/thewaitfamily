@@ -1,13 +1,18 @@
 :root {
-  --background: #f9f7f2;
+  --background: #f5f7fb;
+  --background-alt: #ecf1f9;
   --surface: #ffffff;
-  --accent: #d2691e;
-  --accent-dark: #b05819;
-  --text: #2f2a26;
-  --muted: #6f665e;
-  --border: #e6dfd3;
-  --shadow: 0 12px 30px -16px rgba(47, 42, 38, 0.5);
-  font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --surface-muted: #f0f4fb;
+  --accent: #2563eb;
+  --accent-dark: #1d4ed8;
+  --accent-soft: rgba(37, 99, 235, 0.1);
+  --text: #1f2937;
+  --muted: #6b7280;
+  --border: #d8e0ef;
+  --shadow: 0 28px 60px -38px rgba(15, 23, 42, 0.45);
+  --radius-lg: 1.5rem;
+  --radius-md: 1rem;
+  font-family: "Inter", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
   color: var(--text);
 }
 

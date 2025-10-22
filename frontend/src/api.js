@@ -9,4 +9,39 @@ const apiClient = axios.create({
   },
 });
 
+let authToken = null;
+
+export const setAuthToken = (token) => {
+  authToken = token;
+  if (token) {
+    apiClient.defaults.headers.common.Authorization = `Bearer ${token}`;
+  } else {
+    delete apiClient.defaults.headers.common.Authorization;
+  }
+};
+
+export const getAuthToken = () => authToken;
+
+if (typeof window !== "undefined") {
+  const storedToken = window.localStorage.getItem("adminToken");
+  if (storedToken) {
+    setAuthToken(storedToken);
+  }
+}
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (
+      typeof window !== "undefined" &&
+      error.response?.status === 401 &&
+      window.localStorage.getItem("adminToken")
+    ) {
+      window.localStorage.removeItem("adminToken");
+      setAuthToken(null);
+    }
+    return Promise.reject(error);
+  }
+);
+
 export default apiClient;
