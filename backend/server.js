@@ -1,20 +1,17 @@
 const express = require("express");
-const mysql = require("mysql2/promise");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
+const path = require("path");
+const fs = require("fs/promises");
+const sqlite3 = require("sqlite3");
+const { open } = require("sqlite");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-const mysqlBaseConfig = {
-  host: process.env.DB_HOST || "db",
-  port: process.env.DB_PORT || "3306",
-  user: process.env.DB_USER || "root",
-  password: process.env.DB_PASSWORD || "pass123",
-};
-
-const databaseName = process.env.DB_NAME || "appdb";
+const databaseFile =
+  process.env.DB_PATH || path.join(__dirname, "data", "app.sqlite3");
 const adminUsername = process.env.ADMIN_USERNAME || "family-admin";
 const adminPassword = process.env.ADMIN_PASSWORD || "wait-family-secret";
 const jwtSecret = process.env.JWT_SECRET || "change-me-in-production";
@@ -233,13 +230,10 @@ const mapFamilyStoryRow = (row) => ({
   updatedAt: row.updated_at,
 });
 
-const ensureColumnExists = async (connection, tableName, columnName, definition) => {
-  const [columns] = await connection.query(
-    `SHOW COLUMNS FROM \`${tableName}\` LIKE ?`,
-    [columnName]
-  );
-  if (!columns.length) {
-    await connection.query(`ALTER TABLE \`${tableName}\` ADD COLUMN ${definition}`);
+const ensureColumnExists = async (db, tableName, columnName, definition) => {
+  const columns = await db.all(`PRAGMA table_info(${tableName})`);
+  if (!columns.some((column) => column.name === columnName)) {
+    await db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${definition}`);
   }
 };
 
@@ -267,21 +261,19 @@ const ensureDatabase = async () => {
     return;
   }
 
-  const { host, port, user, password } = mysqlBaseConfig;
   const maxRetries = parseInt(process.env.DB_RETRY_ATTEMPTS || "10", 10);
   const retryDelay = parseInt(process.env.DB_RETRY_DELAY_MS || "2000", 10);
 
   let attempt = 0;
-  let baseConnection = null;
+  let db = null;
 
   while (attempt < maxRetries) {
     attempt += 1;
     try {
-      baseConnection = await mysql.createConnection({
-        host,
-        port,
-        user,
-        password,
+      await fs.mkdir(path.dirname(databaseFile), { recursive: true });
+      db = await open({
+        filename: databaseFile,
+        driver: sqlite3.Database,
       });
       break;
     } catch (error) {
@@ -297,125 +289,131 @@ const ensureDatabase = async () => {
     }
   }
 
-  await baseConnection.query(`CREATE DATABASE IF NOT EXISTS \`${databaseName}\``);
-  await baseConnection.end();
+  await db.exec("PRAGMA foreign_keys = ON");
 
-  pool = mysql.createPool({
-    ...mysqlBaseConfig,
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0,
-    database: databaseName,
-  });
-
-  const connection = await pool.getConnection();
-
-  try {
-    await connection.query(`CREATE TABLE IF NOT EXISTS recipes (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      title VARCHAR(255) NOT NULL,
-      description TEXT,
-      cook_time VARCHAR(50),
-      servings VARCHAR(50),
-      ingredients TEXT,
-      instructions LONGTEXT,
-      image_url TEXT,
-      status VARCHAR(20) NOT NULL DEFAULT 'pending',
-      submitted_by_name VARCHAR(255),
-      submitted_by_email VARCHAR(255),
-      submitted_notes TEXT,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    )`);
-
-    await ensureColumnExists(
-      connection,
-      "recipes",
-      "status",
-      "status VARCHAR(20) NOT NULL DEFAULT 'pending'"
-    );
-    await ensureColumnExists(
-      connection,
-      "recipes",
-      "submitted_by_name",
-      "submitted_by_name VARCHAR(255)"
-    );
-    await ensureColumnExists(
-      connection,
-      "recipes",
-      "submitted_by_email",
-      "submitted_by_email VARCHAR(255)"
-    );
-    await ensureColumnExists(
-      connection,
-      "recipes",
-      "submitted_notes",
-      "submitted_notes TEXT"
-    );
-
-    await connection.query(
-      "UPDATE recipes SET status = 'approved' WHERE status IS NULL OR status = ''"
-    );
-
-    const [rows] = await connection.query("SELECT COUNT(*) AS count FROM recipes");
-
-    if (rows[0].count === 0) {
-      for (const recipe of seedRecipes) {
-        await connection.query(
-          `INSERT INTO recipes (title, description, cook_time, servings, ingredients, instructions, image_url, status)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            recipe.title,
-            recipe.description,
-            recipe.cook_time,
-            recipe.servings,
-            collapseMultilineField(recipe.ingredients),
-            collapseMultilineField(recipe.instructions),
-            recipe.image_url,
-            "approved",
-          ]
-        );
-      }
-      console.log("Seeded recipes table with starter data.");
+  const query = async (sql, params = []) => {
+    const command = sql.trim().split(/\s+/)[0].toUpperCase();
+    if (command === "SELECT" || command === "WITH" || command === "PRAGMA") {
+      const rows = await db.all(sql, params);
+      return [rows, null];
     }
 
-    await connection.query(`CREATE TABLE IF NOT EXISTS family_stories (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      title VARCHAR(255) NOT NULL,
-      description TEXT,
-      video_url TEXT NOT NULL,
-      status VARCHAR(20) NOT NULL DEFAULT 'draft',
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    )`);
+    const result = await db.run(sql, params);
+    return [
+      {
+        insertId: typeof result.lastID === "number" ? result.lastID : null,
+        affectedRows: typeof result.changes === "number" ? result.changes : 0,
+      },
+      null,
+    ];
+  };
 
-    await ensureColumnExists(
-      connection,
-      "family_stories",
-      "status",
-      "status VARCHAR(20) NOT NULL DEFAULT 'draft'"
-    );
+  pool = { query };
 
-    await connection.query(
-      "UPDATE family_stories SET status = 'published' WHERE status IS NULL OR status = ''"
-    );
+  await db.exec(`CREATE TABLE IF NOT EXISTS recipes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    description TEXT,
+    cook_time TEXT,
+    servings TEXT,
+    ingredients TEXT,
+    instructions TEXT,
+    image_url TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    submitted_by_name TEXT,
+    submitted_by_email TEXT,
+    submitted_notes TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+  )`);
 
-    const [storyCountRows] = await connection.query(
-      "SELECT COUNT(*) AS count FROM family_stories"
-    );
+  await ensureColumnExists(
+    db,
+    "recipes",
+    "status",
+    "status TEXT NOT NULL DEFAULT 'pending'"
+  );
+  await ensureColumnExists(
+    db,
+    "recipes",
+    "submitted_by_name",
+    "submitted_by_name TEXT"
+  );
+  await ensureColumnExists(
+    db,
+    "recipes",
+    "submitted_by_email",
+    "submitted_by_email TEXT"
+  );
+  await ensureColumnExists(
+    db,
+    "recipes",
+    "submitted_notes",
+    "submitted_notes TEXT"
+  );
 
-    if (storyCountRows[0].count === 0) {
-      for (const story of seedFamilyStories) {
-        await connection.query(
-          `INSERT INTO family_stories (title, description, video_url, status)
-           VALUES (?, ?, ?, ?)`,
-          [story.title, story.description, story.video_url, story.status]
-        );
-      }
-      console.log("Seeded family_stories table with starter data.");
+  await db.run(
+    "UPDATE recipes SET status = 'approved', updated_at = CURRENT_TIMESTAMP WHERE COALESCE(status, '') = ''"
+  );
+
+  const recipeCountRows = await db.all("SELECT COUNT(*) AS count FROM recipes");
+  const recipeCount = recipeCountRows[0]?.count ?? 0;
+
+  if (recipeCount === 0) {
+    for (const recipe of seedRecipes) {
+      await db.run(
+        `INSERT INTO recipes (title, description, cook_time, servings, ingredients, instructions, image_url, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          recipe.title,
+          recipe.description,
+          recipe.cook_time,
+          recipe.servings,
+          collapseMultilineField(recipe.ingredients),
+          collapseMultilineField(recipe.instructions),
+          recipe.image_url,
+          "approved",
+        ]
+      );
     }
-  } finally {
-    connection.release();
+    console.log("Seeded recipes table with starter data.");
+  }
+
+  await db.exec(`CREATE TABLE IF NOT EXISTS family_stories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    description TEXT,
+    video_url TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'draft',
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  await ensureColumnExists(
+    db,
+    "family_stories",
+    "status",
+    "status TEXT NOT NULL DEFAULT 'draft'"
+  );
+
+  await db.run(
+    "UPDATE family_stories SET status = 'published', updated_at = CURRENT_TIMESTAMP WHERE COALESCE(status, '') = ''"
+  );
+
+  const storyCountRows = await db.all(
+    "SELECT COUNT(*) AS count FROM family_stories"
+  );
+  const storyCount = storyCountRows[0]?.count ?? 0;
+
+  if (storyCount === 0) {
+    for (const story of seedFamilyStories) {
+      await db.run(
+        `INSERT INTO family_stories (title, description, video_url, status)
+         VALUES (?, ?, ?, ?)`,
+        [story.title, story.description, story.video_url, story.status]
+      );
+    }
+    console.log("Seeded family_stories table with starter data.");
   }
 };
 
@@ -639,7 +637,7 @@ app.put("/api/recipes/:id", authenticateAdmin, async (req, res) => {
   try {
     const [result] = await pool.query(
       `UPDATE recipes
-       SET title = ?, description = ?, cook_time = ?, servings = ?, ingredients = ?, instructions = ?, image_url = ?, status = ?, submitted_by_name = ?, submitted_by_email = ?, submitted_notes = ?
+       SET title = ?, description = ?, cook_time = ?, servings = ?, ingredients = ?, instructions = ?, image_url = ?, status = ?, submitted_by_name = ?, submitted_by_email = ?, submitted_notes = ?, updated_at = CURRENT_TIMESTAMP
        WHERE id = ?`,
       [
         title.trim(),
@@ -680,7 +678,7 @@ app.patch("/api/recipes/:id/status", authenticateAdmin, async (req, res) => {
 
   try {
     const [result] = await pool.query(
-      "UPDATE recipes SET status = ? WHERE id = ?",
+      "UPDATE recipes SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
       [normalizedStatus, req.params.id]
     );
 
@@ -802,7 +800,7 @@ app.put("/api/family-stories/:id", authenticateAdmin, async (req, res) => {
   try {
     const [result] = await pool.query(
       `UPDATE family_stories
-       SET title = ?, description = ?, video_url = ?, status = ?
+       SET title = ?, description = ?, video_url = ?, status = ?, updated_at = CURRENT_TIMESTAMP
        WHERE id = ?`,
       [title.trim(), description.trim(), videoUrl.trim(), normalizedStatus, req.params.id]
     );
@@ -830,7 +828,7 @@ app.patch("/api/family-stories/:id/status", authenticateAdmin, async (req, res) 
 
   try {
     const [result] = await pool.query(
-      "UPDATE family_stories SET status = ? WHERE id = ?",
+      "UPDATE family_stories SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
       [normalizedStatus, req.params.id]
     );
 

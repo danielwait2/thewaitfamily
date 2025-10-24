@@ -14,6 +14,20 @@ const Header = () => (
         <NavLink to="/recipes" className={({ isActive }) => (isActive ? "active" : "")}>
           Recipes
         </NavLink>
+        <div className="nav-dropdown">
+          <button type="button" className="nav-dropdown-toggle">
+            Siblings
+            <span aria-hidden="true">▾</span>
+          </button>
+          <div className="nav-dropdown-menu">
+            <NavLink
+              to="/siblings/christmas/giftlist/2025"
+              className={({ isActive }) => (isActive ? "active" : "")}
+            >
+              Christmas Gift List 2025
+            </NavLink>
+          </div>
+        </div>
         <NavLink
           to="/recipes/submit"
           className={({ isActive }) => `cta-link ${isActive ? "active" : ""}`}

@@ -2,7 +2,7 @@
 
 This project is a Dockerized full-stack application featuring:
 
-- A MySQL database seeded with a few family-favorite recipes.
+- A SQLite database stored on disk and seeded with a few family-favorite recipes.
 - An Express API for managing recipe content.
 - A React frontend with public recipe browsing and a simple `/admin` dashboard to add, edit, or delete entries.
 
@@ -24,9 +24,8 @@ Services:
 
 - Frontend: http://localhost:3001
 - API: http://localhost:3000/api
-- MySQL: localhost:3307 (user `root`, password `pass123`)
 
-The first boot uses `script.sql` plus server-side seeding to ensure the `recipes` table exists and is populated.
+The backend creates `backend/data/app.sqlite3` on first boot and seeds both recipes and family stories if the tables are empty. The optional `script.sql` mirrors the schema and seed data using SQLite syntax.
 
 ## Frontend routes
 

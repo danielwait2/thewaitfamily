@@ -6,6 +6,7 @@ import RecipeDetailPage from "./pages/RecipeDetailPage";
 import AdminPage from "./pages/AdminPage";
 import FamilyStoriesPage from "./pages/FamilyStoriesPage";
 import SubmitRecipePage from "./pages/SubmitRecipePage";
+import SiblingsGiftList2025Page from "./pages/SiblingsGiftList2025Page";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import "./App.css";
@@ -24,6 +25,10 @@ function App() {
             <Route path="/recipe" element={<Navigate to="/recipes" replace />} />
             <Route path="/family-stories" element={<FamilyStoriesPage />} />
             <Route path="/admin" element={<AdminPage />} />
+            <Route
+              path="/siblings/christmas/giftlist/2025"
+              element={<SiblingsGiftList2025Page />}
+            />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>

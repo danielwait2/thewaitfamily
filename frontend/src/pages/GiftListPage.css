@@ -1,0 +1,102 @@
+.gift-list-page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 3rem;
+}
+
+.gift-list-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.gift-list-header h1 {
+  font-size: 2.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.gift-list-section {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1.5rem;
+}
+
+.gift-assignments {
+  margin-bottom: 2.5rem;
+  background: #f7f9fc;
+  border-radius: 16px;
+  padding: 1.75rem;
+  box-shadow: inset 0 0 0 1px rgba(17, 50, 107, 0.08);
+}
+
+.gift-assignments h2 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  font-size: 1.75rem;
+  text-align: center;
+}
+
+.gift-assignments-note {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  color: #344054;
+}
+
+.assignments-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.assignment-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 1rem;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+
+.assignment-arrow {
+  font-size: 1.5rem;
+  color: #fb7185;
+}
+
+.assignment-giver,
+.assignment-receiver {
+  white-space: nowrap;
+}
+
+.gift-card {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  padding: 1.5rem;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.gift-card h2 {
+  margin-bottom: 0.75rem;
+  font-size: 1.4rem;
+}
+
+.gift-card ul {
+  list-style: disc inside;
+  margin: 0;
+  padding: 0;
+}
+
+.gift-card li + li {
+  margin-top: 0.5rem;
+}
+
+.gift-list-footer {
+  margin-top: 2.5rem;
+  text-align: center;
+  color: #666666;
+  font-size: 0.95rem;
+}
