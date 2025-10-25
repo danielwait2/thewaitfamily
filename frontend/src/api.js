@@ -1,6 +1,13 @@
 import axios from "axios";
 
-export const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:3000/api";
+const envApiUrl = (process.env.REACT_APP_API_URL || "").trim();
+
+const defaultApiUrl =
+  typeof window !== "undefined"
+    ? `${window.location.origin.replace(/\/$/, "")}/api`
+    : "http://localhost:3000/api";
+
+export const API_BASE_URL = envApiUrl || defaultApiUrl;
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
